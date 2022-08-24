@@ -158,6 +158,10 @@ function compile() {
 	}
 	
     var newIframe = document.createElement('iframe');
+	newIframe.setAttribute('id','iframe');
+	newIframe.setAttribute('class','panel');
+	newIframe.src = 'about:blank'; 
+	document.body.appendChild(newIframe);
 	newIframe.contentWindow.document.open('text/html', 'replace');
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js'></scr"+"ipt>");
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/cjs/react-jsx-runtime.production.min.js'></scr"+"ipt>");
