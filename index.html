@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" integrity="sha512-GZ1RIgZaSc8rnco/8CXfRdCpDxRCphenIiZ2ztLy3XQfCbQUSCuk8IudvNHxkRA3oUg6q0qejgN/qqyG1duv5Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <div id="name">
-	<h1>Full Stack Code Simulator</h1>	
+	<h1>Front-End Code Simulator</h1>	
   </div>
   <div id="names">
 	<h3 id="nhtml">HTML</h3> 
@@ -182,7 +182,7 @@ function compile() {
 function setupEditorhtml()
 {
   window.html = ace.edit("html");
-  html.setTheme("ace/theme/iplastic");
+  html.setTheme("ace/theme/monokai");
   html.getSession().setMode("ace/mode/html");
   html.focus();
   
@@ -191,7 +191,7 @@ function setupEditorhtml()
     showLineNumbers:false,
     showGutter: false,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
 html.setValue("<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n\n\n\n</body>\n</html>\n",1);  
 html.setShowPrintMargin(false);
@@ -200,7 +200,7 @@ html.setShowPrintMargin(false);
 function setupEditorcss()
 {
   window.css = ace.edit("css");
-  css.setTheme("ace/theme/iplastic");
+  css.setTheme("ace/theme/monokai");
   css.getSession().setMode("ace/mode/css");
 
   css.setOptions({
@@ -208,7 +208,7 @@ function setupEditorcss()
     showLineNumbers:false,
     showGutter: false,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
   	css.setValue("/* CSS Goes Here*/\n",1);
 
@@ -219,7 +219,7 @@ function setupEditorcss()
 function setupEditorjs()
 {
   window.js = ace.edit("js");
-  js.setTheme("ace/theme/iplastic");
+  js.setTheme("ace/theme/monokai");
   js.getSession().setMode("ace/mode/javascript");
  
   js.setOptions({
@@ -227,7 +227,7 @@ function setupEditorjs()
     showLineNumbers:false,
     showGutter: false,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
   	js.setValue("/* Java Script and Angular JS Goes Here*/\n",1);
 
@@ -237,7 +237,7 @@ function setupEditorjs()
 function setupEditorrjs()
 {
   window.rjs = ace.edit("rjs");
-  rjs.setTheme("ace/theme/iplastic");
+  rjs.setTheme("ace/theme/monokai");
   rjs.getSession().setMode("ace/mode/javascript");
 
   rjs.setOptions({
@@ -262,7 +262,7 @@ setupEditorrjs();
 function clearAll()
 {
   window.html = ace.edit("html");
-  html.setTheme("ace/theme/iplastic");
+  html.setTheme("ace/theme/monokai");
   html.getSession().setMode("ace/mode/html");
   html.focus();
   
@@ -271,14 +271,14 @@ function clearAll()
     showLineNumbers:false,
     showGutter: false,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
 html.setValue("<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n\n\n\n</body>\n</html>\n",1);  
   html.setShowPrintMargin(false);
   html.setBehavioursEnabled(false);
   
   window.css = ace.edit("css");
-  css.setTheme("ace/theme/iplastic");
+  css.setTheme("ace/theme/monokai");
   css.getSession().setMode("ace/mode/css");
 
   css.setOptions({
@@ -286,7 +286,7 @@ html.setValue("<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n\n\n\n</body>\n
     showLineNumbers:false,
     showGutter: false,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
   	css.setValue("/* CSS Goes Here*/\n",1);
 
@@ -296,7 +296,7 @@ html.setValue("<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n\n\n\n</body>\n
   
   
   window.js = ace.edit("js");
-  js.setTheme("ace/theme/iplastic");
+  js.setTheme("ace/theme/monokai");
   js.getSession().setMode("ace/mode/javascript");
  
   js.setOptions({
@@ -304,7 +304,7 @@ html.setValue("<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n\n\n\n</body>\n
     showLineNumbers:false,
     showGutter: false,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
   	js.setValue("/* Java Script and Angular JS Goes Here*/\n",1);
 
@@ -312,15 +312,15 @@ html.setValue("<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n\n\n\n</body>\n
   js.setBehavioursEnabled(false);
   
   window.rjs = ace.edit("rjs");
-  rjs.setTheme("ace/theme/iplastic");
+  rjs.setTheme("ace/theme/monokai");
   rjs.getSession().setMode("ace/mode/javascript");
 
   rjs.setOptions({
     fontSize: "12pt",
-    showLineNumbers:false,
-    showGutter: false,
+    showLineNumbers:true,
+    showGutter: true,
     vScrollBarAlwaysVisible:true,
-    enableBasicAutocompletion: false, enableLiveAutocompletion: false
+    enableBasicAutocompletion: true, enableLiveAutocompletion: true
   });
   	rjs.setValue("/*React JS Goes Here*/\n",1);
 
