@@ -158,10 +158,6 @@ function compile() {
 	}
 	
     var newIframe = document.createElement('iframe');
-	newIframe.setAttribute('id','iframe');
-	newIframe.setAttribute('class','panel');
-	newIframe.src = 'about:blank'; 
-	document.body.appendChild(newIframe);
 	newIframe.contentWindow.document.open('text/html', 'replace');
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js'></scr"+"ipt>");
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/cjs/react-jsx-runtime.production.min.js'></scr"+"ipt>");
@@ -169,6 +165,11 @@ function compile() {
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.0.0-alpha-464f27572-20210713/cjs/react-dom-server-legacy.browser.production.min.js'></scr"+"ipt>");
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/react-router/5.2.0/react-router.min.js'></scr"+"ipt>");
 	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.2.0/react-router-dom.min.js'></scr"+"ipt>");
+	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/angularjs-slider/7.0.0/rzslider.min.js'></scr"+"ipt>");
+	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/angular-animate/1.8.2/angular-animate.min.js'></scr"+"ipt>");
+	newIframe.contentWindow.document.write("<scr"+"ipt src='https://cdnjs.cloudflare.com/ajax/libs/angularjs-nvd3-directives/0.0.7/angularjs-nvd3-directives.min.js'></scr"+"ipt>");
+	newIframe.contentWindow.document.write("\n<scr"+"ipt src='https://unpkg.com/react@16/umd/react.production.min.js'>"+"</scr"+"ipt>"+"\n<scr"+"ipt src='https://unpkg.com/react-dom@16/umd/react-dom.production.min.js'>"+"</scr"+"ipt>"+"\n<scr"+"ipt src='https://unpkg.com/babel-standalone@6.15.0/babel.min.js'>"+"</scr"+"ipt>");
+
 	newIframe.contentWindow.document.write(html.getValue()+"<style>"+css.getValue()+"</style>"+"<scr"+"ipt>"+js.getValue()+"</scr"+"ipt>"+"<scr"+"ipt type='text/babel'>"+rjs.getValue()+"</scr"+"ipt>");
 	newIframe.contentWindow.document.close();
 	c = 1;
