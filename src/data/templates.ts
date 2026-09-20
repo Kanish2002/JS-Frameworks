@@ -141,7 +141,20 @@ export default function App() {
   },
 };
 
+const angularMain = {
+  code: `import { enableProdMode } from '@angular/core';
+import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app/app.module';
+
+enableProdMode();
+
+platformBrowserDynamic()
+  .bootstrapModule(AppModule)
+  .catch(error => console.error(error));`,
+};
+
 const angularStarter = {
+  "/src/main.ts": angularMain,
   "/src/app/app.component.ts": {
     code: `import { Component } from '@angular/core';
 
@@ -174,6 +187,7 @@ export class AppComponent {
 };
 
 const angularTasks = {
+  "/src/main.ts": angularMain,
   "/src/app/app.module.ts": {
     code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';

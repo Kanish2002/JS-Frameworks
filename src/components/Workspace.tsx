@@ -7,7 +7,7 @@ import {
   useSandpack,
 } from "@codesandbox/sandpack-react";
 import { ChevronDown, ChevronUp, Laptop, Monitor, Smartphone, TerminalSquare } from "lucide-react";
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import type { DeviceId, PlaygroundMode, ThemeId } from "../types";
 
@@ -73,11 +73,15 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
 ) {
   const [device, setDevice] = useState<DeviceId>("desktop");
   const [consoleOpen, setConsoleOpen] = useState(true);
+  // Sandpack treats a new files object as a workspace reset. Keep the files
+  // passed at mount stable so autosave re-renders never steal editor focus.
+  // Mode, template, and reset actions intentionally remount this component.
+  const initialFiles = useRef(files).current;
 
   return (
     <SandpackProvider
       template={mode.sandpackTemplate}
-      files={files}
+      files={initialFiles}
       theme={theme}
       options={{
         autorun: true,
