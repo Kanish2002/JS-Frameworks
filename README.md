@@ -8,6 +8,8 @@ FrameLab is a modern, browser-based frontend playground for experimenting with:
 
 Each framework runs in its own isolated Sandpack runtime. The app includes live preview, console output, responsive device previews, starter templates, local autosave, shareable URLs, theme switching, and ZIP export.
 
+The plain web workspace follows CodePen-style panel semantics: `index.html` may contain only body markup, while `styles.css` and `index.js` are injected automatically into a sandboxed preview. Full HTML documents are supported too. Paste compiled CSS into `styles.css`; raw SCSS syntax requires compilation first.
+
 ## Run locally
 
 ```bash
