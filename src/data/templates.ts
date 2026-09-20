@@ -1,25 +1,15 @@
 import type { PlaygroundMode } from "../types";
 
 const vanillaStarter = {
+  "/package.json": { code: "{}", hidden: true },
   "/index.html": {
-    code: `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-<main class="hero">
+    code: `<main class="hero">
   <span class="eyebrow">HTML · CSS · JavaScript</span>
   <h1>Build something<br><em>worth sharing.</em></h1>
   <p>Edit the files, press Run, and watch your idea come alive.</p>
   <button id="spark">Make some magic</button>
   <div id="message" aria-live="polite"></div>
-</main>
-<script src="/index.js"></script>
-</body>
-</html>`,
+</main>`,
   },
   "/styles.css": {
     code: `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
@@ -56,16 +46,9 @@ button.addEventListener('click', () => {
 };
 
 const vanillaDashboard = {
+  "/package.json": { code: "{}", hidden: true },
   "/index.html": {
-    code: `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-<main>
+    code: `<main>
   <header><div><span>Overview</span><h1>Good morning, Kanish.</h1></div><button>Export report</button></header>
   <section class="metrics">
     <article><span>Revenue</span><strong>₹84.2K</strong><small class="up">↗ 12.4%</small></article>
@@ -73,10 +56,7 @@ const vanillaDashboard = {
     <article><span>Conversion</span><strong>4.82%</strong><small>↘ 0.3%</small></article>
   </section>
   <section class="chart-card"><div><span>Performance</span><strong>Weekly revenue</strong></div><div id="chart"></div></section>
-</main>
-<script src="/index.js"></script>
-</body>
-</html>`,
+</main>`,
   },
   "/styles.css": {
     code: `*{box-sizing:border-box}body{margin:0;background:#f3f2ed;color:#191917;font-family:Inter,system-ui,sans-serif}main{max-width:1080px;margin:auto;padding:48px 28px}header{display:flex;align-items:end;justify-content:space-between}span{color:#77776e;font-size:13px}h1{margin:7px 0 0;font-size:32px;letter-spacing:-.04em}button{border:0;border-radius:10px;padding:12px 16px;background:#191917;color:#fff;font-weight:600}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:34px 0}.metrics article,.chart-card{background:white;border:1px solid #deddd5;border-radius:16px;padding:22px}.metrics strong{display:block;font-size:30px;margin:18px 0 8px}.metrics small{color:#e05b52}.metrics .up{color:#3c8c61}.chart-card strong{display:block;margin-top:6px}.chart-card>div:first-child{margin-bottom:28px}#chart{height:260px;display:flex;align-items:end;gap:10px}@media(max-width:650px){.metrics{grid-template-columns:1fr}header{align-items:start;gap:20px}h1{font-size:26px}}`,
@@ -233,7 +213,7 @@ export const PLAYGROUND_MODES: PlaygroundMode[] = [
     id: "vanilla",
     label: "HTML, CSS & JS",
     shortLabel: "Web",
-    description: "The browser fundamentals, with zero setup.",
+    description: "CodePen-style HTML, CSS, and JavaScript with zero setup.",
     accent: "#b9ff66",
     sandpackTemplate: "static",
     templates: [

@@ -165,11 +165,18 @@ button { color: inherit; }
 .preview-device[data-device="mobile"] { width: min(390px, 100%); }
 .preview-device .sp-stack, .preview-device .sp-preview-container, .preview-device .sp-preview-iframe { width: 100% !important; height: 100% !important; }
 .preview-device .sp-preview-container { border: 0 !important; border-radius: 0 !important; }
+.plain-preview-iframe { display: block; width: 100%; height: 100%; border: 0; background: white; }
 
 .console-panel { grid-column: 1 / -1; display: flex; flex-direction: column; overflow: hidden; }
 .console-toggle { height: 38px; flex: 0 0 38px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 16px; border: 0; border-bottom: 1px solid var(--line); color: var(--text-muted); background: var(--panel); cursor: pointer; }
 .console-toggle > span { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; }
 .console-panel .sp-console { min-height: 0 !important; flex: 1; border: 0 !important; border-radius: 0 !important; background: var(--panel) !important; font: 11px/1.5 "JetBrains Mono", monospace !important; }
+.plain-console { min-height: 0; flex: 1; overflow: auto; padding: 8px 0; background: var(--panel); color: var(--text-muted); font: 11px/1.5 "JetBrains Mono", monospace; }
+.plain-console > div { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; padding: 5px 14px; border-bottom: 1px solid var(--line-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.plain-console > div > span { color: var(--text-faint); text-transform: uppercase; font-size: 9px; letter-spacing: .08em; }
+.plain-console > div[data-level="warn"] { color: #e6b85c; background: color-mix(in srgb, #e6b85c 7%, transparent); }
+.plain-console > div[data-level="error"] { color: #ff7b72; background: color-mix(in srgb, #ff7b72 7%, transparent); }
+.console-empty { display: block; padding: 7px 14px; color: var(--text-faint); }
 
 .keyboard-hint { position: fixed; z-index: 30; right: 16px; bottom: 12px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--text-faint); background: color-mix(in srgb, var(--panel-raised) 92%, transparent); font-size: 10px; box-shadow: var(--shadow); pointer-events: none; opacity: .7; }
 .keyboard-hint kbd { color: var(--text-muted); font: 500 9px "JetBrains Mono", monospace; }
