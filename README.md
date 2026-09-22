@@ -40,3 +40,15 @@ Your latest files are saved in browser storage. Use **Share** to copy the curren
 - CSS design system without an additional UI framework
 
 The original proof of concept injected all frameworks into one iframe. FrameLab separates the runtimes, avoiding dependency collisions while keeping the product fully client-side.
+
+### HTML/CSS/JS regression checks
+
+With the development server running, install the optional browser test runner
+(`npm install --no-save playwright` and `npx playwright install chromium`), then run
+`node tests/vanilla-preview.cjs`. Set `BASE_URL` to test a different server and
+`CHROMIUM_PATH` to use an existing Chromium executable.
+
+The checks cover script execution, CSS, repeated Run clicks, CSS/JS editing and
+undo, editor focus through autosave, relative local script/style references,
+deferred script order, and inline error reporting. The plain preview uses native
+browser scripts; npm imports and bundling belong in the framework workspaces.
