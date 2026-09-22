@@ -56,13 +56,53 @@ function ActionBridge({ onFilesChange, registerRun, useSandpackRuntime }: Action
 }
 
 function buildPlainDocument(files: ReturnType<typeof useSandpack>["sandpack"]["files"], channel: string) {
-  const html = files["/index.html"]?.code ?? "";
-  const css = files["/styles.css"]?.code ?? "";
-  const javascript = files["/index.js"]?.code ?? "";
-  const cleanHtml = html
-    .replace(/<link\b[^>]*href=["']\/?styles\.css["'][^>]*>/gi, "")
-    .replace(/<script\b[^>]*src=["']\/?index\.js["'][^>]*><\/script>/gi, "");
-  const consoleBridge = `<script>
+  // Parse HTML instead of replacement strings: $&, $` and closing script
+  // tags in user code must never be interpreted while composing the preview.
+  const document = new DOMParser().parseFromString(files["/index.html"]?.code ?? "", "text/html");
+  if (!document.querySelector('meta[name="viewport"]')) {
+    const viewport = document.createElement("meta");
+    viewport.name = "viewport";
+    viewport.content = "width=device-width, initial-scale=1.0";
+    document.head.prepend(viewport);
+  }
+  const dataUrl = (type: string, code: string) => `data:${type};charset=utf-8,${encodeURIComponent(code)}`;
+  const localPath = (reference: string) => {
+    try {
+      const url = new URL(reference, "https://framelab.invalid/index.html");
+      return url.origin === "https://framelab.invalid" ? decodeURIComponent(url.pathname) : null;
+    } catch {
+      return null; // Incomplete URLs while typing must not break the editor.
+    }
+  };
+  const referenced = new Set<string>();
+  document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]').forEach((link) => {
+    const path = localPath(link.getAttribute("href")!);
+    if (path && files[path]) {
+      referenced.add(path);
+      link.href = dataUrl("text/css", files[path].code);
+    }
+  });
+  document.querySelectorAll<HTMLScriptElement>("script[src]").forEach((script) => {
+    const path = localPath(script.getAttribute("src")!);
+    if (path && files[path]) {
+      referenced.add(path);
+      script.src = dataUrl("text/javascript", files[path].code);
+    }
+  });
+  if (files["/styles.css"] && !referenced.has("/styles.css")) {
+    const styles = document.createElement("link");
+    styles.rel = "stylesheet";
+    styles.href = dataUrl("text/css", files["/styles.css"].code);
+    document.head.append(styles);
+  }
+  if (files["/index.js"] && !referenced.has("/index.js")) {
+    const script = document.createElement("script");
+    script.src = dataUrl("text/javascript", files["/index.js"].code);
+    // Run after the DOM and earlier deferred dependencies, before DOMContentLoaded.
+    script.defer = true;
+    document.body.append(script);
+  }
+  const consoleBridge = `
 (() => {
   const channel = ${JSON.stringify(channel)};
   const send = (level, values) => {
@@ -78,21 +118,11 @@ function buildPlainDocument(files: ReturnType<typeof useSandpack>["sandpack"]["f
   });
   window.addEventListener("error", event => send("error", [event.message]));
   window.addEventListener("unhandledrejection", event => send("error", [event.reason]));
-})();
-<\/script>`;
-  const styles = `<style>${css}</style>`;
-  const script = `<script>${javascript}<\/script>`;
-
-  if (/<(?:!doctype|html)\b/i.test(cleanHtml)) {
-    const withStyles = /<\/head>/i.test(cleanHtml)
-      ? cleanHtml.replace(/<\/head>/i, `${styles}</head>`)
-      : `${styles}${cleanHtml}`;
-    return /<\/body>/i.test(withStyles)
-      ? withStyles.replace(/<\/body>/i, `${consoleBridge}${script}</body>`)
-      : `${withStyles}${consoleBridge}${script}`;
-  }
-
-  return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${styles}</head><body>${cleanHtml}${consoleBridge}${script}</body></html>`;
+})();`;
+  const bridge = document.createElement("script");
+  bridge.textContent = consoleBridge;
+  document.head.prepend(bridge);
+  return `<!doctype html>${document.documentElement.outerHTML}`;
 }
 
 interface PlainPreviewProps {
@@ -104,11 +134,12 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
   const { sandpack } = useSandpack();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const channelRef = useRef(`preview-${Math.random().toString(36).slice(2)}`);
-  const [srcDoc, setSrcDoc] = useState("");
+  const [preview, setPreview] = useState({ srcDoc: "", revision: 0 });
 
   const compile = useCallback(() => {
     onLogsChange([]);
-    setSrcDoc(buildPlainDocument(sandpack.files, channelRef.current));
+    const srcDoc = buildPlainDocument(sandpack.files, channelRef.current);
+    setPreview((current) => ({ srcDoc, revision: current.revision + 1 }));
   }, [onLogsChange, sandpack.files]);
 
   useEffect(() => registerRun(compile), [compile, registerRun]);
@@ -122,7 +153,7 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data as Partial<ConsoleEntry> & { source?: string; channel?: string };
-      if (data.source !== "framelab-preview" || data.channel !== channelRef.current || !data.message) return;
+      if (!data || data.source !== "framelab-preview" || data.channel !== channelRef.current || typeof data.message !== "string") return;
       const level = ["log", "info", "warn", "error"].includes(data.level ?? "")
         ? data.level as ConsoleEntry["level"]
         : "log";
@@ -134,11 +165,12 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
 
   return (
     <iframe
+      key={preview.revision}
       ref={iframeRef}
       className="plain-preview-iframe"
       title="HTML, CSS and JavaScript preview"
       sandbox="allow-downloads allow-forms allow-modals allow-popups allow-scripts"
-      srcDoc={srcDoc}
+      srcDoc={preview.srcDoc}
     />
   );
 }
@@ -217,6 +249,8 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
           <div className="editor-body">
             <SandpackFileExplorer autoHiddenFiles />
             <SandpackCodeEditor
+              initMode="immediate"
+              showRunButton={mode.id !== "vanilla"}
               showTabs
               closableTabs={false}
               showLineNumbers
