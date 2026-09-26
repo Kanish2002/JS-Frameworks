@@ -18,6 +18,7 @@ export interface PlaygroundMode {
   description: string;
   accent: string;
   sandpackTemplate: SandpackPredefinedTemplate;
+  externalResources: string[];
   templates: PlaygroundTemplate[];
 }
 

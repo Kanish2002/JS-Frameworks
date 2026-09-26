@@ -1,4 +1,5 @@
 import type { PlaygroundMode } from "../types";
+import { BASIC_RUNTIME_RESOURCES } from "./runtimeResources";
 
 const vanillaStarter = {
   "/package.json": { code: "{}", hidden: true },
@@ -216,6 +217,7 @@ export const PLAYGROUND_MODES: PlaygroundMode[] = [
     description: "CodePen-style HTML, CSS, and JavaScript with zero setup.",
     accent: "#b9ff66",
     sandpackTemplate: "static",
+    externalResources: BASIC_RUNTIME_RESOURCES,
     templates: [
       { id: "vanilla-starter", name: "Creative starter", description: "A bold interactive landing page", files: vanillaStarter },
       { id: "vanilla-dashboard", name: "Metrics dashboard", description: "Responsive cards and a tiny chart", files: vanillaDashboard },
@@ -228,6 +230,7 @@ export const PLAYGROUND_MODES: PlaygroundMode[] = [
     description: "Components, hooks, and JSX in an isolated runtime.",
     accent: "#8e7dff",
     sandpackTemplate: "react",
+    externalResources: BASIC_RUNTIME_RESOURCES,
     templates: [
       { id: "react-starter", name: "Stateful hero", description: "A focused React state example", files: reactStarter },
       { id: "react-cards", name: "Project library", description: "Filtering, cards, and responsive UI", files: reactCards },
@@ -240,6 +243,7 @@ export const PLAYGROUND_MODES: PlaygroundMode[] = [
     description: "Templates, binding, and TypeScript components.",
     accent: "#ff7657",
     sandpackTemplate: "angular",
+    externalResources: BASIC_RUNTIME_RESOURCES,
     templates: [
       { id: "angular-starter", name: "Bound counter", description: "Events, state, and interpolation", files: angularStarter },
       { id: "angular-tasks", name: "Task list", description: "Forms, loops, and two-way binding", files: angularTasks },

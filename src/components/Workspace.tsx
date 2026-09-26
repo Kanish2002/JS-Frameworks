@@ -83,6 +83,7 @@ function buildPlainDocument(
   files: ReturnType<typeof useSandpack>["sandpack"]["files"],
   channel: string,
   storage: { local: Record<string, string>; session: Record<string, string> },
+  externalResources: string[],
 ) {
   // Parse HTML instead of replacement strings: $&, $` and closing script
   // tags in user code must never be interpreted while composing the preview.
@@ -117,6 +118,23 @@ function buildPlainDocument(
       script.src = dataUrl("text/javascript", files[path].code);
     }
   });
+  // Runtime libraries are parser-blocking scripts in the document head. This
+  // makes their globals available to inline code and user files in a stable,
+  // declared order without document.write. Respect an explicitly included URL
+  // so a pasted project never downloads or executes the same library twice.
+  const existingExternalScripts = Array.from(document.querySelectorAll<HTMLScriptElement>("script[src]"));
+  const runtimeScripts = document.createDocumentFragment();
+  externalResources.forEach((source) => {
+    const matchingScripts = existingExternalScripts.filter((script) => script.src === source);
+    const script = matchingScripts.shift() ?? document.createElement("script");
+    matchingScripts.forEach((duplicate) => duplicate.remove());
+    script.src = source;
+    script.removeAttribute("async");
+    script.removeAttribute("defer");
+    script.dataset.framelabRuntimeResource = "true";
+    runtimeScripts.append(script);
+  });
+  document.head.prepend(runtimeScripts);
   if (files["/styles.css"] && !referenced.has("/styles.css")) {
     const styles = document.createElement("link");
     styles.rel = "stylesheet";
@@ -174,7 +192,14 @@ function buildPlainDocument(
     const original = console[level];
     console[level] = (...values) => { send(level, values); original.apply(console, values); };
   });
-  window.addEventListener("error", event => send("error", [event.message]));
+  window.addEventListener("error", event => {
+    const target = event.target;
+    if (target instanceof HTMLScriptElement && target.src) {
+      send("error", ["Could not load runtime script: " + target.src]);
+      return;
+    }
+    send("error", [event.message || "Unknown preview error"]);
+  }, true);
   window.addEventListener("unhandledrejection", event => send("error", [event.reason]));
 })();`;
   const bridge = document.createElement("script");
@@ -186,9 +211,10 @@ function buildPlainDocument(
 interface PlainPreviewProps {
   registerRun: (run: () => void) => void;
   onLogsChange: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>;
+  externalResources: string[];
 }
 
-function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
+function PlainPreview({ registerRun, onLogsChange, externalResources }: PlainPreviewProps) {
   const { sandpack } = useSandpack();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const channelRef = useRef(`preview-${Math.random().toString(36).slice(2)}`);
@@ -200,9 +226,9 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
 
   const compile = useCallback(() => {
     onLogsChange([]);
-    const srcDoc = buildPlainDocument(sandpack.files, channelRef.current, storage);
+    const srcDoc = buildPlainDocument(sandpack.files, channelRef.current, storage, externalResources);
     setPreview((current) => ({ srcDoc, revision: current.revision + 1 }));
-  }, [onLogsChange, sandpack.files, storage]);
+  }, [externalResources, onLogsChange, sandpack.files, storage]);
 
   useEffect(() => registerRun(compile), [compile, registerRun]);
 
@@ -305,6 +331,7 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
         autorun: mode.id !== "vanilla",
         recompileMode: "delayed",
         recompileDelay: 600,
+        externalResources: mode.id === "vanilla" ? undefined : mode.externalResources,
       }}
     >
       <ActionBridge
@@ -349,7 +376,11 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
           <div className="preview-canvas">
             <div className="preview-device" data-device={device}>
               {mode.id === "vanilla"
-                ? <PlainPreview registerRun={registerRun} onLogsChange={setPlainLogs} />
+                ? <PlainPreview
+                    registerRun={registerRun}
+                    onLogsChange={setPlainLogs}
+                    externalResources={mode.externalResources}
+                  />
                 : <SandpackPreview showNavigator={false} showRefreshButton showOpenInCodeSandbox={false} />}
             </div>
           </div>
