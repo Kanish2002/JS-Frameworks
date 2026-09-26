@@ -41,6 +41,13 @@ Your latest files are saved in browser storage. Use **Share** to copy the curren
 
 The original proof of concept injected all frameworks into one iframe. FrameLab separates the runtimes, avoiding dependency collisions while keeping the product fully client-side.
 
+Every preview preloads a small, version-pinned compatibility set: jQuery
+3.7.1, Lodash 4.17.21, and Hammer.js 1.0.6. The plain runtime inserts these
+scripts before user code; React and Angular receive the same resources through
+Sandpack. Their framework packages remain isolated and are never duplicated by
+CDN globals. A project that explicitly includes one of these exact URLs is not
+loaded twice.
+
 ### HTML/CSS/JS regression checks
 
 With the development server running, install the optional browser test runner
@@ -51,6 +58,7 @@ With the development server running, install the optional browser test runner
 The checks cover script execution, CSS, repeated Run clicks, CSS/JS editing and
 undo, editor focus through autosave, long-file scrolling, responsive layout,
 relative local script/style references, deferred script order, inline error
-reporting, and a keyboard-driven game using localStorage. The plain preview
-uses native browser scripts and a storage bridge inside its isolated iframe;
-npm imports and bundling belong in the framework workspaces.
+reporting, preloaded library order and deduplication, and a keyboard-driven game
+using localStorage. The plain preview uses native browser scripts and a storage
+bridge inside its isolated iframe; npm imports and bundling belong in the
+framework workspaces.

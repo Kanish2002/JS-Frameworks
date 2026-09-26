@@ -8,6 +8,14 @@ const assert = require('node:assert/strict');
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    const runtimeResources = [
+      ['https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js', 'window.__runtimeOrder=(window.__runtimeOrder||[]).concat("jquery");window.jQuery=window.$=function(){};'],
+      ['https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js', 'window.__runtimeOrder=(window.__runtimeOrder||[]).concat("lodash");window._={VERSION:"4.17.21"};'],
+      ['https://cdnjs.cloudflare.com/ajax/libs/hammer.js/1.0.6/hammer.min.js', 'window.__runtimeOrder=(window.__runtimeOrder||[]).concat("hammer");window.Hammer=function(){};'],
+    ];
+    for (const [url, body] of runtimeResources) {
+      await page.route(url, route => route.fulfill({contentType: 'text/javascript', body}));
+    }
     await page.goto(process.env.BASE_URL || 'http://localhost:5173', {waitUntil: 'domcontentloaded'});
     const load = async files => {
       await page.evaluate(files => localStorage.setItem('framelab-workspaces-v2', JSON.stringify({vanilla: files})), files);
@@ -18,9 +26,11 @@ const assert = require('node:assert/strict');
     await load({
       '/index.html': '<!doctype html><html><head></head><body><button id="increment" onclick="increment()">Add</button><output id="count">0</output></body></html>',
       '/styles.css': 'output { color: rgb(1, 2, 3); }',
-      '/index.js': 'const special = "$& $` $\' </script>"; console.log(special); let count = 0; function increment() { document.querySelector("#count").textContent = ++count; } document.addEventListener("DOMContentLoaded", () => console.log("DOM ready"));'
+      '/index.js': 'const special = "$& $` $\' </script>"; document.body.dataset.runtimeOrder = [...window.__runtimeOrder, "user"].join(","); document.body.dataset.runtimeGlobals = [typeof jQuery, typeof _, typeof Hammer].join(","); console.log(special); let count = 0; function increment() { document.querySelector("#count").textContent = ++count; } document.addEventListener("DOMContentLoaded", () => console.log("DOM ready"));'
     });
     const preview = () => page.frameLocator('.plain-preview-iframe');
+    assert.equal(await preview().locator('body').getAttribute('data-runtime-order'), 'jquery,lodash,hammer,user');
+    assert.equal(await preview().locator('body').getAttribute('data-runtime-globals'), 'function,object,function');
     await preview().locator('#increment').click();
     assert.equal(await preview().locator('#count').textContent(), '1');
     assert.equal(await preview().locator('#count').evaluate(el => getComputedStyle(el).color), 'rgb(1, 2, 3)');
@@ -44,6 +54,16 @@ const assert = require('node:assert/strict');
       assert.ok(!(await editor.textContent()).includes('edit-check'));
     }
     console.log('PASS: CSS/JS tab editing, focus after preview/autosave, and undo');
+    const jqueryUrl = 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js';
+    await load({
+      '/index.html': `<html><body><script async src="${jqueryUrl}"></script><script src="${jqueryUrl}"></script><output id="libraries"></output></body></html>`,
+      '/styles.css': '',
+      '/index.js': 'document.querySelector("#libraries").textContent = [typeof jQuery, typeof _, typeof Hammer].join(",");'
+    });
+    await preview().locator('#libraries').filter({hasText: /^function,object,function$/}).waitFor();
+    assert.equal(await preview().locator(`script[src="${jqueryUrl}"]`).count(), 1);
+    assert.equal(await preview().locator(`script[src="${jqueryUrl}"]`).getAttribute('async'), null);
+    console.log('PASS: default runtime libraries load once in deterministic order');
     await load({
       '/index.html': '<html><head><link rel="stylesheet" href="./styles.css"><script defer src="./helper.js"></script><script defer src="./index.js"></script></head><body><output id="result"></output></body></html>',
       '/styles.css': 'output { color: rgb(4, 5, 6); }',
