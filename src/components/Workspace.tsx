@@ -34,6 +34,30 @@ interface ConsoleEntry {
   message: string;
 }
 
+interface StorageUpdate {
+  kind: "local" | "session";
+  action: "set" | "remove" | "clear";
+  key?: string;
+  value?: string;
+}
+
+const PLAIN_STORAGE_KEY = "framelab-plain-preview-storage-v1";
+
+function readPlainStorage(): Record<string, string> {
+  const entries: Record<string, string> = Object.create(null);
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PLAIN_STORAGE_KEY) ?? "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === "string") entries[key] = value;
+      }
+    }
+  } catch {
+    // Storage can be blocked or cleared while the editor is open.
+  }
+  return entries;
+}
+
 function ActionBridge({ onFilesChange, registerRun, useSandpackRuntime }: ActionBridgeProps) {
   const { sandpack } = useSandpack();
 
@@ -55,7 +79,11 @@ function ActionBridge({ onFilesChange, registerRun, useSandpackRuntime }: Action
   return null;
 }
 
-function buildPlainDocument(files: ReturnType<typeof useSandpack>["sandpack"]["files"], channel: string) {
+function buildPlainDocument(
+  files: ReturnType<typeof useSandpack>["sandpack"]["files"],
+  channel: string,
+  storage: { local: Record<string, string>; session: Record<string, string> },
+) {
   // Parse HTML instead of replacement strings: $&, $` and closing script
   // tags in user code must never be interpreted while composing the preview.
   const document = new DOMParser().parseFromString(files["/index.html"]?.code ?? "", "text/html");
@@ -105,6 +133,36 @@ function buildPlainDocument(files: ReturnType<typeof useSandpack>["sandpack"]["f
   const consoleBridge = `
 (() => {
   const channel = ${JSON.stringify(channel)};
+  // srcdoc has an opaque origin. Give ordinary browser snippets a local
+  // Storage API without granting the preview access to the parent page.
+  const initialStorage = ${JSON.stringify(storage).replaceAll("<", "\\u003c")};
+  const createStorage = (initial, kind) => {
+    const entries = Object.assign(Object.create(null), initial);
+    const sync = (action, key, value) => window.parent.postMessage({
+      source: "framelab-preview", channel, storage: { kind, action, key, value }
+    }, "*");
+    const methods = {
+      get length() { return Object.keys(entries).length; },
+      key(index) { return Object.keys(entries)[index] ?? null; },
+      getItem(key) { key = String(key); return Object.prototype.hasOwnProperty.call(entries, key) ? entries[key] : null; },
+      setItem(key, value) { key = String(key); value = String(value); entries[key] = value; sync("set", key, value); },
+      removeItem(key) { key = String(key); delete entries[key]; sync("remove", key); },
+      clear() { Object.keys(entries).forEach(key => delete entries[key]); sync("clear"); }
+    };
+    return new Proxy(methods, {
+      get(target, key) { return key in target ? Reflect.get(target, key) : entries[key]; },
+      set(target, key, value) { methods.setItem(key, value); return true; },
+      deleteProperty(target, key) { methods.removeItem(key); return true; },
+      ownKeys() { return Reflect.ownKeys(entries); },
+      getOwnPropertyDescriptor(target, key) {
+        return Object.prototype.hasOwnProperty.call(entries, key)
+          ? { value: entries[key], writable: true, enumerable: true, configurable: true }
+          : undefined;
+      }
+    });
+  };
+  Object.defineProperty(window, "localStorage", { configurable: true, value: createStorage(initialStorage.local, "local") });
+  Object.defineProperty(window, "sessionStorage", { configurable: true, value: createStorage(initialStorage.session, "session") });
   const send = (level, values) => {
     const message = values.map(value => {
       if (typeof value === "string") return value;
@@ -134,13 +192,17 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
   const { sandpack } = useSandpack();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const channelRef = useRef(`preview-${Math.random().toString(36).slice(2)}`);
+  const [storage] = useState(() => ({
+    local: readPlainStorage(),
+    session: Object.create(null) as Record<string, string>,
+  }));
   const [preview, setPreview] = useState({ srcDoc: "", revision: 0 });
 
   const compile = useCallback(() => {
     onLogsChange([]);
-    const srcDoc = buildPlainDocument(sandpack.files, channelRef.current);
+    const srcDoc = buildPlainDocument(sandpack.files, channelRef.current, storage);
     setPreview((current) => ({ srcDoc, revision: current.revision + 1 }));
-  }, [onLogsChange, sandpack.files]);
+  }, [onLogsChange, sandpack.files, storage]);
 
   useEffect(() => registerRun(compile), [compile, registerRun]);
 
@@ -152,8 +214,22 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
-      const data = event.data as Partial<ConsoleEntry> & { source?: string; channel?: string };
-      if (!data || data.source !== "framelab-preview" || data.channel !== channelRef.current || typeof data.message !== "string") return;
+      const data = event.data as Partial<ConsoleEntry> & { source?: string; channel?: string; storage?: StorageUpdate };
+      if (!data || data.source !== "framelab-preview" || data.channel !== channelRef.current) return;
+      if (data.storage) {
+        const { kind, action, key, value } = data.storage;
+        if (kind !== "local" && kind !== "session") return;
+        const entries = storage[kind];
+        if (action === "set" && typeof key === "string" && typeof value === "string") entries[key] = value;
+        else if (action === "remove" && typeof key === "string") delete entries[key];
+        else if (action === "clear") Object.keys(entries).forEach((entry) => delete entries[entry]);
+        else return;
+        if (kind === "local") {
+          try { window.localStorage.setItem(PLAIN_STORAGE_KEY, JSON.stringify(entries)); } catch { /* Keep this session usable. */ }
+        }
+        return;
+      }
+      if (typeof data.message !== "string") return;
       const level = ["log", "info", "warn", "error"].includes(data.level ?? "")
         ? data.level as ConsoleEntry["level"]
         : "log";
@@ -161,7 +237,7 @@ function PlainPreview({ registerRun, onLogsChange }: PlainPreviewProps) {
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [onLogsChange]);
+  }, [onLogsChange, storage]);
 
   return (
     <iframe

@@ -57,6 +57,40 @@ const assert = require('node:assert/strict');
     await page.getByRole('log').getByText('inline-test-error', {exact: false}).waitFor();
     await page.getByRole('log').getByText('after-error', {exact: false}).waitFor();
     console.log('PASS: early inline errors reported and later scripts execute');
+    await load({
+      '/index.html': '<button id="move">Move</button><output id="score">0</output>',
+      '/styles.css': Array.from({length: 400}, (_, i) => `.tile-${i} { color: red; }`).join('\n'),
+      '/index.js': `let score = Number(localStorage.getItem('framelab-test-score') || 0);
+        localStorage.setItem('framelab-escape', '</script>');
+        document.querySelector('#score').textContent = score;
+        function move() { localStorage.setItem('framelab-test-score', String(++score)); document.querySelector('#score').textContent = score; }
+        document.querySelector('#move').addEventListener('click', move);
+        document.addEventListener('keydown', event => { if (event.key === 'ArrowLeft') move(); });` + Array.from({length: 400}, (_, i) => `\n// game line ${i}`).join(''),
+    });
+    await preview().locator('#move').click();
+    await preview().locator('#score').filter({hasText: /^1$/}).waitFor();
+    await page.locator('.run-button').click();
+    await preview().locator('#score').filter({hasText: /^1$/}).waitFor();
+    await preview().locator('#move').click();
+    await page.keyboard.press('ArrowLeft');
+    await preview().locator('#score').filter({hasText: /^3$/}).waitFor();
+    assert.ok(!(await page.locator('.plain-preview-iframe').getAttribute('sandbox')).includes('allow-same-origin'));
+    await page.reload({waitUntil: 'domcontentloaded'});
+    await preview().locator('#score').filter({hasText: /^3$/}).waitFor();
+    console.log('PASS: game input and saved score survive a preview rerun in an isolated iframe');
+    for (const file of ['styles.css', 'index.js']) {
+      await page.locator('.sp-tab-button').filter({hasText: file}).click();
+      const scroller = page.locator('.cm-scroller');
+      assert.ok(await scroller.evaluate(el => el.scrollHeight > el.clientHeight + 300));
+      await scroller.evaluate(el => { el.scrollTop = 500; });
+      assert.ok(await scroller.evaluate(el => el.scrollTop >= 450));
+    }
+    console.log('PASS: long CSS and JS files scroll inside the editor');
+    await page.setViewportSize({width: 390, height: 844});
+    await page.locator('.preview-panel').scrollIntoViewIfNeeded();
+    assert.ok(await page.locator('.plain-preview-iframe').isVisible());
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+    console.log('PASS: mobile editor and preview remain reachable without horizontal overflow');
     assert.deepEqual(errors.filter(e => !e.includes('inline-test-error')), []);
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

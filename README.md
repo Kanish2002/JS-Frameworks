@@ -49,6 +49,8 @@ With the development server running, install the optional browser test runner
 `CHROMIUM_PATH` to use an existing Chromium executable.
 
 The checks cover script execution, CSS, repeated Run clicks, CSS/JS editing and
-undo, editor focus through autosave, relative local script/style references,
-deferred script order, and inline error reporting. The plain preview uses native
-browser scripts; npm imports and bundling belong in the framework workspaces.
+undo, editor focus through autosave, long-file scrolling, responsive layout,
+relative local script/style references, deferred script order, inline error
+reporting, and a keyboard-driven game using localStorage. The plain preview
+uses native browser scripts and a storage bridge inside its isolated iframe;
+npm imports and bundling belong in the framework workspaces.
