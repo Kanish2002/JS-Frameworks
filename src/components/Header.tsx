@@ -1,5 +1,7 @@
-import { Check, ChevronDown, Download, Moon, Play, Share2, Sun } from "lucide-react";
+import { Check, ChevronDown, Download, Moon, MoreHorizontal, Play, Share2, Sun, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./BrandMark";
+import { getRunShortcutLabel } from "../utils/platform";
 import type { PlaygroundMode, ThemeId } from "../types";
 
 interface HeaderProps {
@@ -25,6 +27,31 @@ export function Header({
   onDownload,
   onThemeToggle,
 }: HeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const runShortcut = getRunShortcutLabel();
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  const runAndClose = (action: () => void) => {
+    action();
+    setMenuOpen(false);
+  };
+
   return (
     <header className="app-header">
       <a className="brand" href="#top" aria-label="FrameLab home">
@@ -58,10 +85,44 @@ export function Header({
           {copied ? <Check size={16} /> : <Share2 size={16} />}
           <span>{copied ? "Copied" : "Share"}</span>
         </button>
-        <button className="run-button" type="button" onClick={onRun}>
+        <div className="mobile-actions" ref={menuRef}>
+          <button
+            className="icon-button mobile-actions-toggle"
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label={menuOpen ? "Close project actions" : "Open project actions"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-project-actions"
+          >
+            {menuOpen ? <X size={18} /> : <MoreHorizontal size={19} />}
+          </button>
+          <div className="mobile-actions-menu" id="mobile-project-actions" data-open={menuOpen}>
+            <label>
+              <span>Starter template</span>
+              <span className="mobile-template-select">
+                <select value={selectedTemplateId} onChange={(event) => runAndClose(() => onTemplateChange(event.target.value))}>
+                  {mode.templates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} aria-hidden="true" />
+              </span>
+            </label>
+            <button type="button" onClick={() => runAndClose(onThemeToggle)}>
+              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+              Use {theme === "dark" ? "light" : "dark"} theme
+            </button>
+            <button type="button" onClick={() => runAndClose(onDownload)}><Download size={17} /> Download project</button>
+            <button type="button" onClick={() => runAndClose(onShare)}>
+              {copied ? <Check size={17} /> : <Share2 size={17} />}
+              {copied ? "Link copied" : "Copy share link"}
+            </button>
+          </div>
+        </div>
+        <button className="run-button" type="button" onClick={onRun} aria-label={`Run project (${runShortcut})`}>
           <Play size={15} fill="currentColor" />
           Run
-          <kbd>⌘↵</kbd>
+          <kbd>{runShortcut}</kbd>
         </button>
       </div>
     </header>

@@ -37,6 +37,7 @@ Your latest files are saved in browser storage. Use **Share** to copy the curren
 - React + TypeScript application shell
 - Vite development and production build
 - CodeSandbox Sandpack for isolated in-browser bundling and preview
+- Accessible, persistent resizable panels for the editor, preview, and console
 - CSS design system without an additional UI framework
 
 The original proof of concept injected all frameworks into one iframe. FrameLab separates the runtimes, avoiding dependency collisions while keeping the product fully client-side.
@@ -48,17 +49,18 @@ Sandpack. Their framework packages remain isolated and are never duplicated by
 CDN globals. A project that explicitly includes one of these exact URLs is not
 loaded twice.
 
-### HTML/CSS/JS regression checks
+### Browser regression checks
 
-With the development server running, install the optional browser test runner
-(`npm install --no-save playwright` and `npx playwright install chromium`), then run
-`node tests/vanilla-preview.cjs`. Set `BASE_URL` to test a different server and
-`CHROMIUM_PATH` to use an existing Chromium executable.
+Install Chromium once, then run the Playwright suite. The test command starts
+the Vite server automatically:
 
-The checks cover script execution, CSS, repeated Run clicks, CSS/JS editing and
-undo, editor focus through autosave, long-file scrolling, responsive layout,
-relative local script/style references, deferred script order, inline error
-reporting, preloaded library order and deduplication, and a keyboard-driven game
-using localStorage. The plain preview uses native browser scripts and a storage
-bridge inside its isolated iframe; npm imports and bundling belong in the
-framework workspaces.
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+The automated checks cover script and stylesheet execution, runtime library
+order, repeated runs, persistent storage, editing and autosave, long-file
+scrolling, resizable and collapsible panels, the responsive file drawer, mobile
+project actions, and horizontal-overflow regressions. GitHub Actions runs both
+the production build and browser suite on every pull request.

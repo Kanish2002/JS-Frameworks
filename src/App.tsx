@@ -5,6 +5,7 @@ import { ModeRail } from "./components/ModeRail";
 import type { WorkspaceActions } from "./components/Workspace";
 import { PLAYGROUND_MODES, getMode } from "./data/templates";
 import { usePersistentState } from "./hooks/usePersistentState";
+import { isApplePlatform } from "./utils/platform";
 import type { ModeId, SavedWorkspaces, ThemeId } from "./types";
 
 const STORAGE_KEY = "framelab-workspaces-v2";
@@ -59,6 +60,7 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState(sharedPayload ? "Shared playground loaded" : "");
   const workspaceRef = useRef<WorkspaceActions>(null);
+  const shortcutModifier = isApplePlatform() ? "⌘" : "Ctrl";
 
   const mode = getMode(activeMode);
   const selectedTemplateId = templateIds[activeMode];
@@ -165,7 +167,7 @@ export default function App() {
           onFilesChange={handleFilesChange}
         />
       </Suspense>
-      <div className="keyboard-hint" aria-hidden="true">Tip: press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run</div>
+      <div className="keyboard-hint" aria-hidden="true">Tip: press <kbd>{shortcutModifier}</kbd> + <kbd>Enter</kbd> to run</div>
       <div className="toast" role="status" data-visible={Boolean(toast)}>{toast}</div>
     </div>
   );
