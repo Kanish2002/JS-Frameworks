@@ -26,7 +26,7 @@ npm run build
 ## How the playground works
 
 1. Pick a runtime from the left rail.
-2. Edit an existing file or use **New file** to add components, scripts, styles, or nested paths.
+2. Edit an existing file or use **New file** to add components, scripts, styles, or nested paths. Web `.js` and `.css` files are registered in `index.html` automatically; framework files run when imported normally.
 3. Press **Run** or `Ctrl/⌘ + Enter`.
 4. Inspect the rendered result and browser console.
 
