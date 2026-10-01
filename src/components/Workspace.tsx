@@ -7,7 +7,7 @@ import {
   useSandpack,
 } from "@codesandbox/sandpack-react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
-import { ChevronDown, ChevronUp, Files, Laptop, Monitor, Smartphone, TerminalSquare, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Files, Laptop, Monitor, Plus, Smartphone, TerminalSquare, X } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import type { Layout } from "react-resizable-panels";
@@ -48,9 +48,35 @@ interface StorageUpdate {
   value?: string;
 }
 
+interface AddFileDialogProps {
+  mode: PlaygroundMode;
+  open: boolean;
+  onClose: () => void;
+}
+
 const PLAIN_STORAGE_KEY = "framelab-plain-preview-storage-v1";
 const EDITOR_LAYOUT_KEY = "framelab-editor-layout-v1";
 const WORKSPACE_LAYOUT_KEY = "framelab-workspace-layout-v1";
+const ANGULAR_PREVIEW_RESET = "<style data-framelab-preview>*{box-sizing:border-box}html,body{margin:0;min-height:100%}</style>";
+
+function prepareInitialFiles(mode: PlaygroundMode, files: SandpackFiles): SandpackFiles {
+  if (mode.id !== "angular") return files;
+  const indexFile = files["/src/index.html"];
+  const code = typeof indexFile === "string" ? indexFile : indexFile?.code;
+  if (
+    !code
+    || code.includes("data-framelab-preview")
+    || !code.includes("<title>Angular</title>")
+    || !code.includes("<app-root></app-root>")
+    || !code.includes("</head>")
+  ) return files;
+
+  const migratedCode = code.replace("</head>", `  ${ANGULAR_PREVIEW_RESET}\n</head>`);
+  return {
+    ...files,
+    "/src/index.html": typeof indexFile === "string" ? migratedCode : { ...indexFile, code: migratedCode },
+  };
+}
 
 function readStoredLayout(key: string, fallback: Layout): Layout {
   try {
@@ -86,6 +112,86 @@ function useMediaQuery(query: string) {
   }, [query]);
 
   return matches;
+}
+
+function AddFileDialog({ mode, open, onClose }: AddFileDialogProps) {
+  const { sandpack } = useSandpack();
+  const [filePath, setFilePath] = useState("");
+  const [error, setError] = useState("");
+  const placeholder = mode.id === "angular"
+    ? "/src/app/example.component.ts"
+    : mode.id === "react"
+      ? "/components/Example.jsx"
+      : "/scripts/example.js";
+
+  useEffect(() => {
+    if (!open) return;
+    setFilePath("");
+    setError("");
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  if (!open) return null;
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    let normalizedPath = filePath.trim().replaceAll("\\", "/");
+    if (!normalizedPath.startsWith("/")) normalizedPath = `/${normalizedPath}`;
+    const segments = normalizedPath.split("/").slice(1);
+    if (
+      normalizedPath === "/"
+      || normalizedPath.endsWith("/")
+      || segments.some((segment) => !segment || segment === "." || segment === "..")
+      || /[?#\0]/.test(normalizedPath)
+    ) {
+      setError("Enter a valid file path, including its file name.");
+      return;
+    }
+    if (sandpack.files[normalizedPath]) {
+      setError("A file already exists at this path.");
+      return;
+    }
+    sandpack.addFile(normalizedPath, "");
+    sandpack.openFile(normalizedPath);
+    onClose();
+  };
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section className="add-file-dialog" role="dialog" aria-modal="true" aria-labelledby="add-file-title">
+        <div className="add-file-dialog-heading">
+          <div><strong id="add-file-title">Add a new file</strong><span>{mode.label} playground</span></div>
+          <button type="button" onClick={onClose} aria-label="Close new file dialog"><X size={17} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <label htmlFor="new-file-path">File path</label>
+          <input
+            id="new-file-path"
+            value={filePath}
+            onChange={(event) => {
+              setFilePath(event.target.value);
+              if (error) setError("");
+            }}
+            placeholder={placeholder}
+            aria-describedby="new-file-help new-file-error"
+            autoFocus
+          />
+          <p id="new-file-help">Include folders in the path when needed. FrameLab creates them automatically.</p>
+          <span className="field-error" id="new-file-error" role="alert">{error}</span>
+          <div className="dialog-actions">
+            <button type="button" onClick={onClose}>Cancel</button>
+            <button type="submit" disabled={!filePath.trim()}><Plus size={15} /> Add file</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 function readPlainStorage(): Record<string, string> {
@@ -371,6 +477,7 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
   const [device, setDevice] = useState<DeviceId>("desktop");
   const [consoleOpen, setConsoleOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [addFileOpen, setAddFileOpen] = useState(false);
   const [plainLogs, setPlainLogs] = useState<ConsoleEntry[]>([]);
   const [runState, setRunState] = useState<RunState>("idle");
   const [saveState, setSaveState] = useState<SaveState>("saved");
@@ -382,7 +489,7 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
   // Sandpack treats a new files object as a workspace reset. Keep the files
   // passed at mount stable so autosave re-renders never steal editor focus.
   // Mode, template, and reset actions intentionally remount this component.
-  const initialFiles = useRef(files).current;
+  const initialFiles = useRef(prepareInitialFiles(mode, files)).current;
   const registerRun = useCallback((run: () => void) => {
     runtimeRunRef.current = run;
   }, []);
@@ -392,6 +499,7 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
   }, []);
   const storeEditorLayout = useCallback((layout: Layout) => storeLayout(EDITOR_LAYOUT_KEY, layout), []);
   const storeWorkspaceLayout = useCallback((layout: Layout) => storeLayout(WORKSPACE_LAYOUT_KEY, layout), []);
+  const closeAddFile = useCallback(() => setAddFileOpen(false), []);
 
   useImperativeHandle(ref, () => ({ run }), [run]);
 
@@ -450,6 +558,9 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
         </div>
         <div className="panel-heading-actions">
           <span className="autosave-status" data-state={saveState}>{saveState === "saving" ? "Saving…" : "Saved locally"}</span>
+          <button className="new-file-button" type="button" onClick={() => setAddFileOpen(true)} aria-haspopup="dialog">
+            <Plus size={14} /> <span>New file</span>
+          </button>
           <button
             className="files-button"
             type="button"
@@ -565,6 +676,7 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
         registerRun={registerRun}
         useSandpackRuntime={mode.id !== "vanilla"}
       />
+      <AddFileDialog mode={mode} open={addFileOpen} onClose={closeAddFile} />
       <main className="studio" id="top" data-console-open={consoleOpen}>
         {isMobileWorkspace
           ? <>{editorPanel}{previewPanel}{consolePanel}</>
