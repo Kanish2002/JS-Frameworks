@@ -6,9 +6,11 @@ import {
   SandpackProvider,
   useSandpack,
 } from "@codesandbox/sandpack-react";
-import { ChevronDown, ChevronUp, Laptop, Monitor, Smartphone, TerminalSquare } from "lucide-react";
+import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
+import { ChevronDown, ChevronUp, Files, Laptop, Monitor, Smartphone, TerminalSquare, X } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
+import type { Layout } from "react-resizable-panels";
 import type { DeviceId, PlaygroundMode, ThemeId } from "../types";
 
 export interface WorkspaceActions {
@@ -24,9 +26,14 @@ interface WorkspaceProps {
 
 interface ActionBridgeProps {
   onFilesChange: (files: SandpackFiles) => void;
+  onRunStateChange: (state: RunState) => void;
+  onSaveStateChange: (state: SaveState) => void;
   registerRun: (run: () => void) => void;
   useSandpackRuntime: boolean;
 }
+
+type RunState = "idle" | "running" | "ready" | "error";
+type SaveState = "saving" | "saved";
 
 interface ConsoleEntry {
   id: number;
@@ -42,6 +49,44 @@ interface StorageUpdate {
 }
 
 const PLAIN_STORAGE_KEY = "framelab-plain-preview-storage-v1";
+const EDITOR_LAYOUT_KEY = "framelab-editor-layout-v1";
+const WORKSPACE_LAYOUT_KEY = "framelab-workspace-layout-v1";
+
+function readStoredLayout(key: string, fallback: Layout): Layout {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(key) ?? "null");
+    if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+    const entries = Object.entries(value);
+    if (entries.length === 0 || entries.some(([, size]) => typeof size !== "number" || !Number.isFinite(size))) {
+      return fallback;
+    }
+    return Object.fromEntries(entries) as Layout;
+  } catch {
+    return fallback;
+  }
+}
+
+function storeLayout(key: string, layout: Layout) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(layout));
+  } catch {
+    // Resizing should remain usable when browser storage is unavailable.
+  }
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const handleChange = () => setMatches(media.matches);
+    handleChange();
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
+  }, [query]);
+
+  return matches;
+}
 
 function readPlainStorage(): Record<string, string> {
   const entries: Record<string, string> = Object.create(null);
@@ -58,7 +103,13 @@ function readPlainStorage(): Record<string, string> {
   return entries;
 }
 
-function ActionBridge({ onFilesChange, registerRun, useSandpackRuntime }: ActionBridgeProps) {
+function ActionBridge({
+  onFilesChange,
+  onRunStateChange,
+  onSaveStateChange,
+  registerRun,
+  useSandpackRuntime,
+}: ActionBridgeProps) {
   const { sandpack } = useSandpack();
 
   useEffect(() => {
@@ -66,15 +117,24 @@ function ActionBridge({ onFilesChange, registerRun, useSandpackRuntime }: Action
   }, [registerRun, sandpack, useSandpackRuntime]);
 
   useEffect(() => {
+    if (!useSandpackRuntime) return;
+    if (sandpack.error || sandpack.status === "timeout") onRunStateChange("error");
+    else if (sandpack.status === "initial" || sandpack.status === "running") onRunStateChange("running");
+    else onRunStateChange("ready");
+  }, [onRunStateChange, sandpack.error, sandpack.status, useSandpackRuntime]);
+
+  useEffect(() => {
+    onSaveStateChange("saving");
     const timeout = window.setTimeout(() => {
       const serializableFiles = Object.fromEntries(
         Object.entries(sandpack.files).map(([path, file]) => [path, file.code]),
       );
       onFilesChange(serializableFiles);
+      onSaveStateChange("saved");
     }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [onFilesChange, sandpack.files]);
+  }, [onFilesChange, onSaveStateChange, sandpack.files]);
 
   return null;
 }
@@ -211,12 +271,14 @@ function buildPlainDocument(
 interface PlainPreviewProps {
   registerRun: (run: () => void) => void;
   onLogsChange: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>;
+  onRunStateChange: (state: RunState) => void;
   externalResources: string[];
 }
 
-function PlainPreview({ registerRun, onLogsChange, externalResources }: PlainPreviewProps) {
+function PlainPreview({ registerRun, onLogsChange, onRunStateChange, externalResources }: PlainPreviewProps) {
   const { sandpack } = useSandpack();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const runHadErrorRef = useRef(false);
   const channelRef = useRef(`preview-${Math.random().toString(36).slice(2)}`);
   const [storage] = useState(() => ({
     local: readPlainStorage(),
@@ -225,10 +287,12 @@ function PlainPreview({ registerRun, onLogsChange, externalResources }: PlainPre
   const [preview, setPreview] = useState({ srcDoc: "", revision: 0 });
 
   const compile = useCallback(() => {
+    runHadErrorRef.current = false;
+    onRunStateChange("running");
     onLogsChange([]);
     const srcDoc = buildPlainDocument(sandpack.files, channelRef.current, storage, externalResources);
     setPreview((current) => ({ srcDoc, revision: current.revision + 1 }));
-  }, [externalResources, onLogsChange, sandpack.files, storage]);
+  }, [externalResources, onLogsChange, onRunStateChange, sandpack.files, storage]);
 
   useEffect(() => registerRun(compile), [compile, registerRun]);
 
@@ -259,11 +323,15 @@ function PlainPreview({ registerRun, onLogsChange, externalResources }: PlainPre
       const level = ["log", "info", "warn", "error"].includes(data.level ?? "")
         ? data.level as ConsoleEntry["level"]
         : "log";
+      if (level === "error") {
+        runHadErrorRef.current = true;
+        onRunStateChange("error");
+      }
       onLogsChange((current) => [...current.slice(-99), { id: Date.now() + Math.random(), level, message: data.message! }]);
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [onLogsChange, storage]);
+  }, [onLogsChange, onRunStateChange, storage]);
 
   return (
     <iframe
@@ -273,6 +341,9 @@ function PlainPreview({ registerRun, onLogsChange, externalResources }: PlainPre
       title="HTML, CSS and JavaScript preview"
       sandbox="allow-downloads allow-forms allow-modals allow-popups allow-scripts"
       srcDoc={preview.srcDoc}
+      onLoad={() => {
+        if (!runHadErrorRef.current) onRunStateChange("ready");
+      }}
     />
   );
 }
@@ -299,7 +370,14 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
 ) {
   const [device, setDevice] = useState<DeviceId>("desktop");
   const [consoleOpen, setConsoleOpen] = useState(true);
+  const [filesOpen, setFilesOpen] = useState(false);
   const [plainLogs, setPlainLogs] = useState<ConsoleEntry[]>([]);
+  const [runState, setRunState] = useState<RunState>("idle");
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [editorLayout] = useState(() => readStoredLayout(EDITOR_LAYOUT_KEY, { editor: 50, preview: 50 }));
+  const [workspaceLayout] = useState(() => readStoredLayout(WORKSPACE_LAYOUT_KEY, { workbench: 76, console: 24 }));
+  const isMobileWorkspace = useMediaQuery("(max-width: 780px)");
+  const consolePanelRef = usePanelRef();
   const runtimeRunRef = useRef<() => void>(() => undefined);
   // Sandpack treats a new files object as a workspace reset. Keep the files
   // passed at mount stable so autosave re-renders never steal editor focus.
@@ -308,19 +386,165 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
   const registerRun = useCallback((run: () => void) => {
     runtimeRunRef.current = run;
   }, []);
+  const run = useCallback(() => {
+    setRunState("running");
+    runtimeRunRef.current();
+  }, []);
+  const storeEditorLayout = useCallback((layout: Layout) => storeLayout(EDITOR_LAYOUT_KEY, layout), []);
+  const storeWorkspaceLayout = useCallback((layout: Layout) => storeLayout(WORKSPACE_LAYOUT_KEY, layout), []);
 
-  useImperativeHandle(ref, () => ({ run: () => runtimeRunRef.current() }), []);
+  useImperativeHandle(ref, () => ({ run }), [run]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
-        runtimeRunRef.current();
+        run();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [run]);
+
+  useEffect(() => {
+    if (!filesOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFilesOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [filesOpen]);
+
+  const toggleConsole = useCallback(() => {
+    if (isMobileWorkspace) {
+      setConsoleOpen((open) => !open);
+      return;
+    }
+    const panel = consolePanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+      setConsoleOpen(true);
+    } else {
+      panel.collapse();
+      setConsoleOpen(false);
+    }
+  }, [consolePanelRef, isMobileWorkspace]);
+
+  const errorCount = plainLogs.filter((entry) => entry.level === "error").length;
+  const runStatusLabel = runState === "running"
+    ? "Running"
+    : runState === "error"
+      ? "Needs attention"
+      : runState === "ready"
+        ? "Up to date"
+        : "Ready to run";
+
+  const editorPanel = (
+    <section className="editor-panel" aria-label="Code editor">
+      <div className="panel-heading">
+        <div>
+          <span className="status-dot" style={{ background: mode.accent }} />
+          <strong>{mode.label}</strong>
+          <span>{mode.description}</span>
+        </div>
+        <div className="panel-heading-actions">
+          <span className="autosave-status" data-state={saveState}>{saveState === "saving" ? "Saving…" : "Saved locally"}</span>
+          <button
+            className="files-button"
+            type="button"
+            onClick={() => setFilesOpen(true)}
+            aria-expanded={filesOpen}
+            aria-controls="project-files-drawer"
+          >
+            <Files size={14} /> Files
+          </button>
+        </div>
+      </div>
+      <div className="editor-body">
+        <SandpackFileExplorer autoHiddenFiles />
+        <SandpackCodeEditor
+          initMode="immediate"
+          showRunButton={mode.id !== "vanilla"}
+          showTabs
+          closableTabs={false}
+          showLineNumbers
+          wrapContent
+        />
+      </div>
+      {filesOpen
+        ? <>
+            <button
+              className="files-drawer-backdrop"
+              type="button"
+              aria-label="Close file drawer"
+              data-open="true"
+              onClick={() => setFilesOpen(false)}
+            />
+            <aside className="files-drawer" id="project-files-drawer" data-open="true" aria-label="Project files">
+              <div className="files-drawer-heading">
+                <strong>Project files</strong>
+                <button type="button" onClick={() => setFilesOpen(false)} aria-label="Close file drawer"><X size={16} /></button>
+              </div>
+              <div onClickCapture={(event) => {
+                if ((event.target as HTMLElement).closest(".sp-file-explorer button")) {
+                  window.setTimeout(() => setFilesOpen(false), 0);
+                }
+              }}>
+                <SandpackFileExplorer autoHiddenFiles />
+              </div>
+            </aside>
+          </>
+        : null}
+    </section>
+  );
+
+  const previewPanel = (
+    <section className="preview-panel" aria-label="Live preview">
+      <div className="panel-heading preview-heading">
+        <div><strong>Preview</strong><span>Isolated browser runtime</span></div>
+        <div className="preview-actions">
+          <span className="runtime-status" data-state={runState}><span />{runStatusLabel}</span>
+          <div className="device-switcher" role="group" aria-label="Preview size">
+            {devices.map(({ id, label, icon: Icon }) => (
+              <button key={id} type="button" data-active={device === id} onClick={() => setDevice(id)} aria-label={label} title={label}>
+                <Icon size={15} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="preview-canvas">
+        <div className="preview-device" data-device={device}>
+          {mode.id === "vanilla"
+            ? <PlainPreview
+                registerRun={registerRun}
+                onLogsChange={setPlainLogs}
+                onRunStateChange={setRunState}
+                externalResources={mode.externalResources}
+              />
+            : <SandpackPreview showNavigator={false} showRefreshButton showOpenInCodeSandbox={false} />}
+        </div>
+      </div>
+    </section>
+  );
+
+  const consolePanel = (
+    <section className="console-panel" data-open={consoleOpen} aria-label="Console output">
+      <button className="console-toggle" type="button" onClick={toggleConsole} aria-expanded={consoleOpen}>
+        <span>
+          <TerminalSquare size={15} /> Console
+          {errorCount > 0 ? <span className="console-count">{errorCount} {errorCount === 1 ? "error" : "errors"}</span> : null}
+        </span>
+        {consoleOpen ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+      </button>
+      {consoleOpen
+        ? mode.id === "vanilla"
+          ? <PlainConsole entries={plainLogs} />
+          : <SandpackConsole standalone showHeader={false} />
+        : null}
+    </section>
+  );
 
   return (
     <SandpackProvider
@@ -336,67 +560,46 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
     >
       <ActionBridge
         onFilesChange={onFilesChange}
+        onRunStateChange={setRunState}
+        onSaveStateChange={setSaveState}
         registerRun={registerRun}
         useSandpackRuntime={mode.id !== "vanilla"}
       />
-      <main className="studio" id="top">
-        <section className="editor-panel" aria-label="Code editor">
-          <div className="panel-heading">
-            <div>
-              <span className="status-dot" style={{ background: mode.accent }} />
-              <strong>{mode.label}</strong>
-              <span>{mode.description}</span>
-            </div>
-            <span className="autosave-status">Saved locally</span>
-          </div>
-          <div className="editor-body">
-            <SandpackFileExplorer autoHiddenFiles />
-            <SandpackCodeEditor
-              initMode="immediate"
-              showRunButton={mode.id !== "vanilla"}
-              showTabs
-              closableTabs={false}
-              showLineNumbers
-              wrapContent
-            />
-          </div>
-        </section>
-
-        <section className="preview-panel" aria-label="Live preview">
-          <div className="panel-heading preview-heading">
-            <div><strong>Preview</strong><span>Isolated browser runtime</span></div>
-            <div className="device-switcher" role="group" aria-label="Preview size">
-              {devices.map(({ id, label, icon: Icon }) => (
-                <button key={id} type="button" data-active={device === id} onClick={() => setDevice(id)} aria-label={label} title={label}>
-                  <Icon size={15} />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="preview-canvas">
-            <div className="preview-device" data-device={device}>
-              {mode.id === "vanilla"
-                ? <PlainPreview
-                    registerRun={registerRun}
-                    onLogsChange={setPlainLogs}
-                    externalResources={mode.externalResources}
-                  />
-                : <SandpackPreview showNavigator={false} showRefreshButton showOpenInCodeSandbox={false} />}
-            </div>
-          </div>
-        </section>
-
-        <section className="console-panel" data-open={consoleOpen} aria-label="Console output">
-          <button className="console-toggle" type="button" onClick={() => setConsoleOpen((open) => !open)} aria-expanded={consoleOpen}>
-            <span><TerminalSquare size={15} /> Console</span>
-            {consoleOpen ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-          </button>
-          {consoleOpen
-            ? mode.id === "vanilla"
-              ? <PlainConsole entries={plainLogs} />
-              : <SandpackConsole standalone showHeader={false} />
-            : null}
-        </section>
+      <main className="studio" id="top" data-console-open={consoleOpen}>
+        {isMobileWorkspace
+          ? <>{editorPanel}{previewPanel}{consolePanel}</>
+          : <Group
+              className="workspace-group"
+              orientation="vertical"
+              defaultLayout={workspaceLayout}
+              onLayoutChanged={storeWorkspaceLayout}
+              resizeTargetMinimumSize={{ fine: 10, coarse: 24 }}
+            >
+              <Panel id="workbench" minSize="45%">
+                <Group
+                  className="workspace-group"
+                  orientation="horizontal"
+                  defaultLayout={editorLayout}
+                  onLayoutChanged={storeEditorLayout}
+                  resizeTargetMinimumSize={{ fine: 10, coarse: 24 }}
+                >
+                  <Panel id="editor" minSize="34%">{editorPanel}</Panel>
+                  <Separator className="resize-handle resize-handle-column" aria-label="Resize editor and preview" />
+                  <Panel id="preview" minSize="34%">{previewPanel}</Panel>
+                </Group>
+              </Panel>
+              <Separator className="resize-handle resize-handle-row" aria-label="Resize console" />
+              <Panel
+                id="console"
+                panelRef={consolePanelRef}
+                minSize="120px"
+                collapsedSize="38px"
+                collapsible
+                onResize={(size) => setConsoleOpen(size.inPixels > 40)}
+              >
+                {consolePanel}
+              </Panel>
+            </Group>}
       </main>
     </SandpackProvider>
   );
