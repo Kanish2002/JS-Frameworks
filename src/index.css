@@ -172,14 +172,14 @@ button { color: inherit; }
 .files-drawer, .files-drawer-backdrop { display: none; }
 
 .preview-heading { padding-right: 12px; }
-.panel-heading .preview-actions { flex: none; gap: 10px; }
+.panel-heading .preview-actions { flex: none; align-items: center; gap: 10px; }
 .runtime-status { display: flex; align-items: center; gap: 6px; color: var(--text-faint); font: 500 9px "JetBrains Mono", monospace; white-space: nowrap; }
 .runtime-status > span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
 .runtime-status[data-state="running"] > span { background: #e6b85c; box-shadow: 0 0 9px color-mix(in srgb, #e6b85c 55%, transparent); animation: pulse 1s ease-in-out infinite alternate; }
 .runtime-status[data-state="ready"] > span { background: #67d391; }
 .runtime-status[data-state="error"] { color: #ff7b72; }
 .runtime-status[data-state="error"] > span { background: #ff7b72; box-shadow: 0 0 9px color-mix(in srgb, #ff7b72 55%, transparent); }
-.device-switcher { padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.device-switcher { flex: none; display: flex; align-items: center; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .device-switcher button { width: 28px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; color: var(--text-faint); background: transparent; cursor: pointer; }
 .device-switcher button:hover { color: var(--text); }
 .device-switcher button[data-active="true"] { color: var(--text); background: var(--panel-raised); box-shadow: 0 1px 4px rgba(0,0,0,.18); }

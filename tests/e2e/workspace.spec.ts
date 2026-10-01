@@ -64,6 +64,21 @@ test("workspace controls stay reachable and panels resize across screen sizes", 
 
   const editorPreviewSeparator = page.getByRole("separator", { name: "Resize editor and preview" });
   await expect(editorPreviewSeparator).toBeVisible();
+  const deviceSwitcher = page.getByRole("group", { name: "Preview size" });
+  const deviceButtons = await deviceSwitcher.getByRole("button").all();
+  const deviceButtonBoxes = await Promise.all(deviceButtons.map((button) => button.boundingBox()));
+  const deviceButtonTopPositions = deviceButtonBoxes.map((box) => box!.y);
+  expect(Math.max(...deviceButtonTopPositions) - Math.min(...deviceButtonTopPositions)).toBeLessThan(2);
+
+  const previewCanvas = page.locator(".preview-canvas");
+  const previewDevice = page.locator(".preview-device");
+  for (const button of deviceButtons) {
+    await button.click();
+    const [canvasBox, deviceBox] = await Promise.all([previewCanvas.boundingBox(), previewDevice.boundingBox()]);
+    const centeredLeft = canvasBox!.x + (canvasBox!.width - deviceBox!.width) / 2;
+    expect(Math.abs(deviceBox!.x - centeredLeft)).toBeLessThan(2);
+  }
+
   const editorBefore = await page.locator(".editor-panel").boundingBox();
   await editorPreviewSeparator.press("ArrowRight");
   const editorAfter = await page.locator(".editor-panel").boundingBox();
