@@ -142,7 +142,7 @@ const angularIndex = {
   <title>Angular playground</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>*{box-sizing:border-box}html,body{margin:0;min-height:100%}</style>
+  <style data-framelab-preview>*{box-sizing:border-box}html,body{margin:0;min-height:100%}</style>
 </head>
 <body><app-root></app-root></body>
 </html>`,

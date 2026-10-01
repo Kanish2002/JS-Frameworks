@@ -57,6 +57,26 @@ interface AddFileDialogProps {
 const PLAIN_STORAGE_KEY = "framelab-plain-preview-storage-v1";
 const EDITOR_LAYOUT_KEY = "framelab-editor-layout-v1";
 const WORKSPACE_LAYOUT_KEY = "framelab-workspace-layout-v1";
+const ANGULAR_PREVIEW_RESET = "<style data-framelab-preview>*{box-sizing:border-box}html,body{margin:0;min-height:100%}</style>";
+
+function prepareInitialFiles(mode: PlaygroundMode, files: SandpackFiles): SandpackFiles {
+  if (mode.id !== "angular") return files;
+  const indexFile = files["/src/index.html"];
+  const code = typeof indexFile === "string" ? indexFile : indexFile?.code;
+  if (
+    !code
+    || code.includes("data-framelab-preview")
+    || !code.includes("<title>Angular</title>")
+    || !code.includes("<app-root></app-root>")
+    || !code.includes("</head>")
+  ) return files;
+
+  const migratedCode = code.replace("</head>", `  ${ANGULAR_PREVIEW_RESET}\n</head>`);
+  return {
+    ...files,
+    "/src/index.html": typeof indexFile === "string" ? migratedCode : { ...indexFile, code: migratedCode },
+  };
+}
 
 function readStoredLayout(key: string, fallback: Layout): Layout {
   try {
@@ -469,7 +489,7 @@ export const Workspace = forwardRef<WorkspaceActions, WorkspaceProps>(function W
   // Sandpack treats a new files object as a workspace reset. Keep the files
   // passed at mount stable so autosave re-renders never steal editor focus.
   // Mode, template, and reset actions intentionally remount this component.
-  const initialFiles = useRef(files).current;
+  const initialFiles = useRef(prepareInitialFiles(mode, files)).current;
   const registerRun = useCallback((run: () => void) => {
     runtimeRunRef.current = run;
   }, []);
