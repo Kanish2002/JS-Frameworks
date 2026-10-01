@@ -114,6 +114,27 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
+function registerPlainRuntimeFile(files: ReturnType<typeof useSandpack>["sandpack"]["files"], path: string) {
+  const indexFile = files["/index.html"];
+  if (!indexFile) return null;
+  const reference = `.${path}`;
+  if (indexFile.code.includes(reference) || indexFile.code.includes(path)) return null;
+
+  if (path.toLowerCase().endsWith(".js")) {
+    const script = `<script src="${reference}" defer></script>`;
+    return indexFile.code.includes("</body>")
+      ? indexFile.code.replace("</body>", `  ${script}\n</body>`)
+      : `${indexFile.code.trimEnd()}\n${script}`;
+  }
+  if (path.toLowerCase().endsWith(".css")) {
+    const stylesheet = `<link rel="stylesheet" href="${reference}">`;
+    return indexFile.code.includes("</head>")
+      ? indexFile.code.replace("</head>", `  ${stylesheet}\n</head>`)
+      : `${stylesheet}\n${indexFile.code}`;
+  }
+  return null;
+}
+
 function AddFileDialog({ mode, open, onClose }: AddFileDialogProps) {
   const { sandpack } = useSandpack();
   const [filePath, setFilePath] = useState("");
@@ -146,7 +167,7 @@ function AddFileDialog({ mode, open, onClose }: AddFileDialogProps) {
       normalizedPath === "/"
       || normalizedPath.endsWith("/")
       || segments.some((segment) => !segment || segment === "." || segment === "..")
-      || /[?#\0]/.test(normalizedPath)
+      || /[?#\0<>"'&]/.test(normalizedPath)
     ) {
       setError("Enter a valid file path, including its file name.");
       return;
@@ -156,6 +177,10 @@ function AddFileDialog({ mode, open, onClose }: AddFileDialogProps) {
       return;
     }
     sandpack.addFile(normalizedPath, "");
+    if (mode.id === "vanilla") {
+      const updatedHtml = registerPlainRuntimeFile(sandpack.files, normalizedPath);
+      if (updatedHtml) sandpack.updateFile("/index.html", updatedHtml);
+    }
     sandpack.openFile(normalizedPath);
     onClose();
   };
@@ -182,7 +207,11 @@ function AddFileDialog({ mode, open, onClose }: AddFileDialogProps) {
             aria-describedby="new-file-help new-file-error"
             autoFocus
           />
-          <p id="new-file-help">Include folders in the path when needed. FrameLab creates them automatically.</p>
+          <p id="new-file-help">
+            {mode.id === "vanilla"
+              ? "JavaScript and CSS files are linked to index.html automatically. Other file types remain available for explicit references."
+              : "Include folders when needed, then import the file from your app or module to execute it."}
+          </p>
           <span className="field-error" id="new-file-error" role="alert">{error}</span>
           <div className="dialog-actions">
             <button type="button" onClick={onClose}>Cancel</button>

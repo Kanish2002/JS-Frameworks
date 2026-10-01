@@ -56,7 +56,14 @@ test("plain HTML, CSS and JavaScript remain editable and execute in order", asyn
   await page.getByLabel("File path").fill("/scripts/helpers.js");
   await page.getByRole("button", { name: "Add file", exact: true }).click();
   await expect(page.locator(".sp-tab-button").filter({ hasText: "helpers.js" })).toBeVisible();
-  await expect(page.locator('.cm-content[aria-label="Code Editor for helpers.js"]')).toHaveAttribute("contenteditable", "true");
+  const helperEditor = page.locator('.cm-content[aria-label="Code Editor for helpers.js"]');
+  await expect(helperEditor).toHaveAttribute("contenteditable", "true");
+  await helperEditor.click();
+  await page.keyboard.insertText('document.body.dataset.addedFile = "running";');
+  await expect(preview.locator("body")).toHaveAttribute("data-added-file", "running");
+
+  await page.locator(".sp-tab-button").filter({ hasText: "index.html" }).click();
+  await expect(page.locator('.cm-content[aria-label="Code Editor for index.html"]')).toContainText('./scripts/helpers.js');
 
   await page.locator(".sp-tab-button").filter({ hasText: "index.js" }).click();
   const scroller = page.locator(".cm-scroller");
