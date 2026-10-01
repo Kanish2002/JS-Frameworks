@@ -52,6 +52,13 @@ test("plain HTML, CSS and JavaScript remain editable and execute in order", asyn
   await expect(editor).toContainText("edit-check");
   await expect(editor).toHaveAttribute("contenteditable", "true");
 
+  await page.getByRole("button", { name: "New file" }).click();
+  await page.getByLabel("File path").fill("/scripts/helpers.js");
+  await page.getByRole("button", { name: "Add file", exact: true }).click();
+  await expect(page.locator(".sp-tab-button").filter({ hasText: "helpers.js" })).toBeVisible();
+  await expect(page.locator('.cm-content[aria-label="Code Editor for helpers.js"]')).toHaveAttribute("contenteditable", "true");
+
+  await page.locator(".sp-tab-button").filter({ hasText: "index.js" }).click();
   const scroller = page.locator(".cm-scroller");
   expect(await scroller.evaluate((element) => element.scrollHeight > element.clientHeight + 300)).toBe(true);
   await scroller.evaluate((element) => { element.scrollTop = 500; });
@@ -64,6 +71,7 @@ test("workspace controls stay reachable and panels resize across screen sizes", 
 
   const editorPreviewSeparator = page.getByRole("separator", { name: "Resize editor and preview" });
   await expect(editorPreviewSeparator).toBeVisible();
+  await expect.poll(() => page.locator(".sp-tabs-scrollable-container").evaluate((element) => getComputedStyle(element).scrollbarWidth)).toBe("thin");
   const deviceSwitcher = page.getByRole("group", { name: "Preview size" });
   const deviceButtons = await deviceSwitcher.getByRole("button").all();
   const deviceButtonBoxes = await Promise.all(deviceButtons.map((button) => button.boundingBox()));

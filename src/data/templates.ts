@@ -134,8 +134,23 @@ platformBrowserDynamic()
   .catch(error => console.error(error));`,
 };
 
+const angularIndex = {
+  code: `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Angular playground</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>*{box-sizing:border-box}html,body{margin:0;min-height:100%}</style>
+</head>
+<body><app-root></app-root></body>
+</html>`,
+};
+
 const angularStarter = {
   "/src/main.ts": angularMain,
+  "/src/index.html": angularIndex,
   "/src/app/app.component.ts": {
     code: `import { Component } from '@angular/core';
 
@@ -169,6 +184,7 @@ export class AppComponent {
 
 const angularTasks = {
   "/src/main.ts": angularMain,
+  "/src/index.html": angularIndex,
   "/src/app/app.module.ts": {
     code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
